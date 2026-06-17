@@ -5,7 +5,6 @@ use std::{
     marker::PhantomData,
 };
 
-use headers::{Header, HeaderMapExt};
 use http::{
     header::HeaderName, HeaderMap, Request as HttpRequest, Response as HttpResponse, StatusCode,
 };
@@ -287,10 +286,9 @@ impl VerifyData {
         // that was not present in the client's handshake (the server has
         // indicated an extension not requested by the client), the client
         // MUST _Fail the WebSocket Connection_. (RFC 6455)
-        let extensions_header =
-            headers.typed_try_get::<SecWebsocketExtensions>().map_err(|_| {
-                ProtocolError::InvalidHeader(SecWebsocketExtensions::name().clone().into())
-            })?;
+        let extensions_header = SecWebsocketExtensions::from_headers(headers).map_err(|_| {
+            ProtocolError::InvalidHeader(SecWebsocketExtensions::name().clone().into())
+        })?;
 
         let extensions = match extensions_header {
             None => Extensions::default(),

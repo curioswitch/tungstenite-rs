@@ -1,5 +1,4 @@
 //! HTTP Request and response header handling.
-use headers::Error;
 use http::HeaderValue;
 
 mod sec_websocket_extensions;
@@ -8,8 +7,12 @@ pub(crate) use sec_websocket_extensions::{
     SecWebsocketExtensions, WebsocketExtensionParam, WebsocketProtocolExtension,
 };
 
+/// Error returned when a delimited HTTP header value cannot be parsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderParseError;
+
 /// Reads a comma-delimited raw header into a Vec.
-fn from_comma_delimited<'i, I, T, E>(values: &mut I) -> Result<E, Error>
+fn from_comma_delimited<'i, I, T, E>(values: &mut I) -> Result<E, HeaderParseError>
 where
     I: Iterator<Item = &'i HeaderValue>,
     T: ::std::str::FromStr,
@@ -19,7 +22,7 @@ where
 }
 
 /// Reads a single-character-delimited raw header into a Vec.
-fn from_delimited<'i, I, T, E>(values: &mut I, delimiter: char) -> Result<E, Error>
+fn from_delimited<'i, I, T, E>(values: &mut I, delimiter: char) -> Result<E, HeaderParseError>
 where
     I: Iterator<Item = &'i str>,
     T: ::std::str::FromStr,
@@ -51,7 +54,7 @@ where
                     "" => None,
                     y => Some(y),
                 })
-                .map(|x| x.parse().map_err(|_| Error::invalid()))
+                .map(|x| x.parse().map_err(|_| HeaderParseError))
         })
         .collect()
 }
