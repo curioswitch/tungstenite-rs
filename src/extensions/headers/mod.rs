@@ -9,7 +9,7 @@ pub(crate) use sec_websocket_extensions::{
 
 /// Error returned when a delimited HTTP header value cannot be parsed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct HeaderParseError;
+pub(crate) struct HeaderParseError;
 
 /// Reads a comma-delimited raw header into a Vec.
 fn from_comma_delimited<'i, I, T, E>(values: &mut I) -> Result<E, HeaderParseError>
