@@ -8,8 +8,12 @@ use crate::extensions::compression::{
     CompressionError, DecompressionError, PerMessageCompressionContext,
 };
 #[cfg(feature = "handshake")]
+use crate::error::ProtocolError;
+#[cfg(feature = "handshake")]
 use crate::extensions::headers::{SecWebsocketExtensions, WebsocketProtocolExtension};
 use crate::protocol::Role;
+#[cfg(feature = "handshake")]
+use http::HeaderMap;
 
 pub mod compression;
 #[cfg(feature = "headers")]
@@ -214,6 +218,42 @@ impl ExtensionsConfig {
             Extensions { per_message_compression },
             response.map(|response| SecWebsocketExtensions::new(std::iter::once(response))),
         ))
+    }
+
+    /// Negotiates extensions for a server-side handshake driven by the caller.
+    ///
+    /// Reads the client's `Sec-WebSocket-Extensions` offers from
+    /// `request_headers`, evaluates them against this configuration, writes the
+    /// agreed-upon `Sec-WebSocket-Extensions` response header (if any) into
+    /// `response_headers`, and returns the [`Extensions`] to pass to
+    /// [`WebSocket::from_raw_socket_with_extensions`].
+    ///
+    /// This is intended for callers that drive the handshake themselves instead
+    /// of using [`ServerHandshake`]. If the client offered no extensions, or
+    /// none were accepted, the returned `Extensions` is empty and
+    /// `response_headers` is left unchanged.
+    ///
+    /// [`WebSocket::from_raw_socket_with_extensions`]: crate::protocol::WebSocket::from_raw_socket_with_extensions
+    /// [`ServerHandshake`]: crate::handshake::server::ServerHandshake
+    pub fn negotiate_response(
+        &self,
+        request_headers: &HeaderMap,
+        response_headers: &mut HeaderMap,
+    ) -> Result<Extensions, ProtocolError> {
+        let offers = match SecWebsocketExtensions::from_headers(request_headers).map_err(|_| {
+            ProtocolError::InvalidHeader(SecWebsocketExtensions::name().clone().into())
+        })? {
+            Some(offers) => offers,
+            None => return Ok(Extensions::default()),
+        };
+
+        let (extensions, agreed) = self.accept_offers(&offers)?;
+
+        if let Some(agreed) = agreed {
+            response_headers.insert(SecWebsocketExtensions::name(), agreed.header_value());
+        }
+
+        Ok(extensions)
     }
 }
 
