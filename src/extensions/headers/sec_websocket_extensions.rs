@@ -1,9 +1,9 @@
 use std::{borrow::Cow, fmt::Debug, iter::FromIterator, str::FromStr};
 
 use bytes::BytesMut;
-use http::HeaderValue;
+use http::{HeaderMap, HeaderName, HeaderValue};
 
-use super::{from_comma_delimited, from_delimited};
+use super::{from_comma_delimited, from_delimited, HeaderParseError};
 
 /// The `Sec-Websocket-Extensions` header.
 ///
@@ -53,6 +53,27 @@ impl SecWebsocketExtensions {
 
         HeaderValue::from_maybe_shared(buffer).expect("valid construction")
     }
+
+    /// The name of this header: `Sec-WebSocket-Extensions`.
+    pub(crate) fn name() -> &'static HeaderName {
+        &http::header::SEC_WEBSOCKET_EXTENSIONS
+    }
+
+    /// Parses the header from an iterator of raw header values.
+    pub(crate) fn decode<'i, I>(values: &mut I) -> Result<Self, HeaderParseError>
+    where
+        I: Iterator<Item = &'i HeaderValue>,
+    {
+        from_comma_delimited(values).map(SecWebsocketExtensions)
+    }
+
+    /// Reads the header from a [`HeaderMap`], returning `Ok(None)` when absent.
+    pub(crate) fn from_headers(headers: &HeaderMap) -> Result<Option<Self>, HeaderParseError> {
+        if !headers.contains_key(Self::name()) {
+            return Ok(None);
+        }
+        Self::decode(&mut headers.get_all(Self::name()).iter()).map(Some)
+    }
 }
 
 impl WebsocketProtocolExtension {
@@ -95,22 +116,6 @@ impl WebsocketExtensionParam {
     }
 }
 
-impl headers::Header for SecWebsocketExtensions {
-    fn name() -> &'static ::http::header::HeaderName {
-        &::http::header::SEC_WEBSOCKET_EXTENSIONS
-    }
-
-    fn decode<'i, I>(values: &mut I) -> Result<Self, headers::Error>
-    where
-        I: Iterator<Item = &'i HeaderValue>,
-    {
-        from_comma_delimited(values).map(SecWebsocketExtensions)
-    }
-    fn encode<E: Extend<headers::HeaderValue>>(&self, values: &mut E) {
-        values.extend(std::iter::once(self.header_value()))
-    }
-}
-
 impl From<WebsocketProtocolExtension> for SecWebsocketExtensions {
     fn from(value: WebsocketProtocolExtension) -> Self {
         Self(vec![value])
@@ -144,7 +149,7 @@ impl<'a> IntoIterator for &'a SecWebsocketExtensions {
 }
 
 impl FromStr for WebsocketProtocolExtension {
-    type Err = headers::Error;
+    type Err = HeaderParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (name, tail) = s.split_once(';').map(|(n, t)| (n, Some(t))).unwrap_or((s, None));
@@ -272,30 +277,27 @@ impl<T: WriteTo, const N: usize> WriteTo for CommaDelimited<[T; N]> {
 
 #[cfg(test)]
 mod tests {
-    use headers::{Header, HeaderMapExt as _};
-
     use super::*;
 
-    fn test_decode<T: Header>(values: &[&str]) -> Option<T> {
+    fn test_decode(values: &[&str]) -> Option<SecWebsocketExtensions> {
         let mut map = ::http::HeaderMap::new();
         for val in values {
-            map.append(T::name(), val.parse().unwrap());
+            map.append(SecWebsocketExtensions::name(), val.parse().unwrap());
         }
-        map.typed_get()
+        SecWebsocketExtensions::from_headers(&map).ok().flatten()
     }
 
     #[cfg(test)]
-    fn test_encode<T: Header>(header: T) -> ::http::HeaderMap {
+    fn test_encode(header: SecWebsocketExtensions) -> ::http::HeaderMap {
         let mut map = ::http::HeaderMap::new();
-        map.typed_insert(header);
+        map.append(SecWebsocketExtensions::name(), header.header_value());
         map
     }
 
     #[test]
     fn parse_separate_headers() {
         // From https://tools.ietf.org/html/rfc6455#section-9.1
-        let extensions =
-            test_decode::<SecWebsocketExtensions>(&["foo", "bar; baz=2"]).expect("valid");
+        let extensions = test_decode(&["foo", "bar; baz=2"]).expect("valid");
 
         assert_eq!(
             extensions,
@@ -314,7 +316,7 @@ mod tests {
 
     #[test]
     fn round_trip_complex() {
-        let extensions = test_decode::<SecWebsocketExtensions>(&[
+        let extensions = test_decode(&[
             "deflate-stream",
             "mux; max-channels=4; flow-control, deflate-stream",
             "private-extension",

@@ -754,7 +754,6 @@ impl ParamName {
 #[cfg(test)]
 mod test {
     use crate::extensions::headers::SecWebsocketExtensions;
-    use headers::Header;
     use http::HeaderValue;
 
     use super::*;
@@ -812,7 +811,9 @@ mod test {
         let client_config = DeflateConfig::new();
 
         let mut headers = Vec::with_capacity(1);
-        SecWebsocketExtensions::new([client_config.as_offer().as_extension()]).encode(&mut headers);
+        headers.push(
+            SecWebsocketExtensions::new([client_config.as_offer().as_extension()]).header_value(),
+        );
 
         assert_eq!(
             headers,
@@ -924,7 +925,7 @@ mod test {
     }
 
     mod rfc_7692_section_7_1_3_examples {
-        use headers::HeaderMap;
+        use http::HeaderMap;
 
         use super::*;
 
