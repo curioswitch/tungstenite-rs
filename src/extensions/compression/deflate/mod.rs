@@ -145,7 +145,7 @@ impl DeflateCompress {
     /// Compress the contents of an entire message.
     ///
     /// This is asymmetric with [`DeflateDecompress::decompress`] in that it
-    /// operates on the contents of an entire message, not the comprising frames.
+    /// operates on the contents of an entire message, not the constituent frames.
     fn compress(&mut self, mut data: &[u8]) -> Result<Bytes, std::io::Error> {
         log::trace!("compressing message payload with {} bytes", data.len());
         if data.is_empty() {
@@ -157,7 +157,10 @@ impl DeflateCompress {
             return Ok(Bytes::from_static(&[0x00]));
         }
 
-        let mut output = Vec::new();
+        // Pre-size for the common case of compressible data (output smaller
+        // than input) to avoid repeated reallocations while growing from empty.
+        // Incompressible payloads may still grow the buffer past this.
+        let mut output = Vec::with_capacity(data.len() / 2 + 64);
 
         // The amount of space that should be available in `output` before
         // attempting to compress data into it.
@@ -482,7 +485,7 @@ pub(crate) mod test {
         }
     }
 
-    /// Utilities for testing decomrpession of highly-compressed payloads.
+    /// Utilities for testing decompression of highly-compressed payloads.
     pub(crate) mod very_compressed {
         use bytes::Bytes;
 

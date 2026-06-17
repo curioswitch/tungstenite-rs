@@ -124,7 +124,7 @@ impl ExtensionsConfig {
     /// Checks whether the given extension headers are compatible with the given
     /// config (if any).
     ///
-    /// Recieves a [`SecWebsocketExtensions`] header in a handshake request and
+    /// Receives a [`SecWebsocketExtensions`] header in a handshake request and
     /// evaluates it against the given local configuration. Returns a
     /// `SecWebsocketExtensions` header to be sent in the handshake response to
     /// the client, and a `Extensions` value to be used for the connection, once

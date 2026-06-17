@@ -11,18 +11,18 @@ use super::{from_comma_delimited, from_delimited, HeaderParseError};
 /// server and then from the server to the client. It is a proposed and
 /// agreed-upon list of websocket protocol extensions to use.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct SecWebsocketExtensions(Vec<WebsocketProtocolExtension>);
+pub(crate) struct SecWebsocketExtensions(Vec<WebsocketProtocolExtension>);
 
 /// An extension listed in a [`SecWebsocketExtensions`] header.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct WebsocketProtocolExtension {
+pub(crate) struct WebsocketProtocolExtension {
     name: Cow<'static, str>,
     params: Vec<WebsocketExtensionParam>,
 }
 
 /// Named parameter for an extension in a `Sec-Websocket-Extensions` header.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct WebsocketExtensionParam {
+pub(crate) struct WebsocketExtensionParam {
     name: Cow<'static, str>,
     value: Option<String>,
 }
